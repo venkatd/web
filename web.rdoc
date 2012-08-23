@@ -1,0 +1,5 @@
+= web
+
+Generate this with
+    web rdoc
+After you have described your command line interface

@@ -1,0 +1,6 @@
+= web
+
+Describe your project here
+
+:include:web.rdoc
+

@@ -1,0 +1,116 @@
+#!/usr/bin/env ruby
+# 1.9 adds realpath to resolve symlinks; 1.8 doesn't
+# have this method, so we add it so we get resolved symlinks
+# and compatibility
+unless File.respond_to? :realpath
+  class File #:nodoc:
+    def self.realpath path
+      return realpath(File.readlink(path)) if symlink?(path)
+      path
+    end
+  end
+end
+$: << File.expand_path(File.dirname(File.realpath(__FILE__)) + '/../lib')
+
+require 'rubygems'
+require 'gli'
+require 'web_version'
+require 'mysql'
+
+include GLI::App
+
+program_desc 'Do web stuff'
+
+version Web::VERSION
+
+command :php do |c|
+
+  c.command :start do |start|
+    start.action do
+      system('sudo /etc/init.d/apache2 start')
+    end
+  end
+
+  c.command :stop do |stop|
+    stop.action do
+      system('sudo /etc/init.d/apache2 stop')
+    end
+  end
+
+  c.command :restart do |restart|
+    restart.action do
+      system('sudo /etc/init.d/apache2 restart')
+    end
+  end
+
+  c.command :switch do |switch|
+    switch.action do
+      web_dir = Dir.pwd
+
+      Dir.chdir('/var')
+      system("sudo rm -r -f www")
+      system("sudo ln -s #{web_dir} www")
+
+      puts "Switched web directory to #{web_dir}."
+    end
+  end
+
+  c.command :logs do |logs|
+    logs.action do
+      system("nautilus /var/log/apache2")
+    end
+  end
+
+end
+
+command :mysql do |c|
+
+  def mysql
+    @mysql ||= MySQL.new('root', '123')
+  end
+
+  c.command :export do |export|
+    export.action do |global_options, options, args|
+      database = args[0]
+      file = args[1] || "#{database}.sql"
+      mysql.export(database, file)
+    end
+  end
+
+  c.command :import do |import|
+    import.action do |global_options, options, args|
+      file, database = args
+      mysql.import(file, database)
+    end
+  end
+
+  c.command :databases do |databases|
+    databases.action do |global_options, options, args|
+      puts mysql.tables
+    end
+  end
+
+end
+
+pre do |global,command,options,args|
+  # Pre logic here
+  # Return true to proceed; false to abort and not call the
+  # chosen command
+  # Use skips_pre before a command to skip this block
+  # on that command only
+  true
+end
+
+post do |global,command,options,args|
+  # Post logic here
+  # Use skips_post before a command to skip this
+  # block on that command only
+end
+
+on_error do |exception|
+  # Error logic here
+  # return false to skip default error handling
+  true
+end
+
+exit run(ARGV)
