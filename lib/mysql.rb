@@ -1,34 +1,42 @@
 class MySQL
 
-  def initialize(username, password)
-    @username = username
-    @password = password
+  def initialize(options)
+    @options = options
   end
 
   def exec(sql)
-    command = "sudo #{mysql} --user=#{username} --password=#{password} --verbose -e \"#{sql}\""
+    command = "sudo #{mysql} --verbose -e \"#{sql}\""
     system(command)
   end
 
   def result(sql)
-    command = "sudo #{mysql} --user=#{username} --password=#{password} --verbose -e \"#{sql}\""
+    command = "sudo #{mysql} --verbose -e \"#{sql}\""
     `#{command}`
   end
 
+  def options(*include)
+    opts = @options.to_hash
+
+    opts[:user] = opts[:username]
+    opts.delete(:username)
+    opts = opts.select { |k, _| include.include?(k) }
+    opts.map { |option, value| "--#{option}=#{value}"}.join(" ")
+  end
+
   def username
-    @username
+    @options[:username]
   end
 
   def password
-    @password
+    @options[:password]
   end
 
   def mysqldump
-    'mysqldump'
+    "mysqldump #{options :user, :password, :host, :port}"
   end
 
   def mysql
-    'mysql'
+    "mysql #{options :user, :password, :host, :port}"
   end
 
   def export(database_name, file_name = nil)
@@ -36,7 +44,9 @@ class MySQL
 
     dest = File.join(Dir.pwd, file_name)
 
-    command = "sudo #{mysqldump} --opt --user=#{username} --password=#{password} #{database_name} > #{dest}"
+    command = "sudo #{mysqldump} --opt #{database_name} > #{dest}"
+
+    puts command
 
     system(command)
 
@@ -47,8 +57,13 @@ class MySQL
     src = File.join(Dir.pwd, file)
 
     exec("CREATE DATABASE IF NOT EXISTS #{database}")
-    command = "sudo mysql --user=#{username} --password=#{password} --verbose #{database} < #{src}"
+    command = "sudo #{mysql} --verbose #{database} < #{src}"
     system(command)
+  end
+
+  def console
+    puts mysql
+    system(mysql)
   end
 
   def tables

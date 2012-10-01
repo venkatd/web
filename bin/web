@@ -14,6 +14,7 @@ $: << File.expand_path(File.dirname(File.realpath(__FILE__)) + '/../lib')
 
 require 'rubygems'
 require 'gli'
+require 'configliere'
 require 'web_version'
 require 'mysql'
 
@@ -21,7 +22,19 @@ include GLI::App
 
 program_desc 'Do web stuff'
 
+
+Settings.read '~/web.yml'
+Settings.resolve!
+
 version Web::VERSION
+
+command :config do |c|
+  c.command :list do |list|
+    list.action do
+      puts Settings.to_yaml
+    end
+  end
+end
 
 command :php do |c|
 
@@ -65,15 +78,17 @@ end
 
 command :mysql do |c|
 
-  def mysql
-    @mysql ||= MySQL.new('root', '123')
+  def mysql_for(options)
+    @mysql ||= MySQL.new(options)
   end
 
   c.command :export do |export|
     export.action do |global_options, options, args|
       database = args[0]
       file = args[1] || "#{database}.sql"
-      mysql.export(database, file)
+
+      db_options = Settings[:databases][database]
+      mysql_for(db_options).export(db_options[:name], file)
     end
   end
 
@@ -81,6 +96,15 @@ command :mysql do |c|
     import.action do |global_options, options, args|
       file, database = args
       mysql.import(file, database)
+    end
+  end
+
+  c.command :console do |console|
+    console.action do |global_options, options, args|
+      database = args[0]
+      db_options = Settings[:databases][database]
+
+      mysql_for(db_options).console
     end
   end
 
