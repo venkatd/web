@@ -17,6 +17,7 @@ require 'gli'
 require 'configliere'
 require 'web_version'
 require 'mysql'
+require 'tempfile'
 
 include GLI::App
 
@@ -79,31 +80,86 @@ end
 command :mysql do |c|
 
   def mysql_for(options)
-    @mysql ||= MySQL.new(options)
+    MySQL.new(options)
   end
 
-  c.command :export do |export|
-    export.action do |global_options, options, args|
-      database = args[0]
-      file = args[1] || "#{database}.sql"
-
-      db_options = Settings[:databases][database]
-      mysql_for(db_options).export(db_options[:name], file)
-    end
+  def db_options_for(database)
+    db_options = Settings[:databases][database]
+    raise "The database config for #{database} doesn't exist." if db_options.nil?
+    return db_options
   end
 
-  c.command :import do |import|
-    import.action do |global_options, options, args|
-      file, database = args
-      mysql.import(file, database)
+  def temp_file_name(prefix)
+    file_name = prefix + "-" + Time.now.strftime("%Y%m%d%H%I%S") + ".sql"
+    File.write(file_name, "")
+    return file_name
+  end
+
+  def delete_file(file)
+    File.delete(file)
+    puts "Deleted #{file}"
+  end
+
+  def mysql_export(source_database_key, dest_file)
+    db_options = db_options_for(source_database_key)
+
+    puts "Began exporting database from #{source_database_key} to #{dest_file}..."
+    mysql_for(db_options).export(db_options[:name], dest_file)
+    puts "Finished exporting database from #{source_database_key} to #{dest_file}..."
+  end
+
+  def mysql_import(source_file, dest_database_key)
+    db_options = db_options_for(dest_database_key)
+
+    puts "Began importing #{source_file} into #{dest_database_key}..."
+    mysql_for(db_options).import(source_file, db_options[:name])
+    puts "Finished importing #{source_file} into #{dest_database_key}..."
+  end
+
+  def copy(source_file, dest_file)
+    puts "Copying #{source_file} to #{dest_file}"
+    system("cp #{source_file} #{dest_file}")
+  end
+
+  def is_sql_file?(item)
+    item[-4..-1] == '.sql'
+  end
+
+  def is_database?(item)
+    Settings[:databases].include?(item)
+  end
+
+  c.command :transfer do |transfer|
+    transfer.action do |global_options, options, args|
+      source, dest = args
+
+      if is_sql_file?(source) && is_sql_file?(dest)
+        copy(source, dest)
+      elsif is_sql_file?(source) && is_database?(dest)
+        mysql_import(source, dest)
+      elsif is_database?(source) && is_sql_file?(dest)
+        mysql_export(source, dest)
+      elsif is_database?(source) && is_database?(dest)
+        puts "Backing up database: #{dest}:"
+        backup_file_name = temp_file_name(dest + '-backup')
+        mysql_export(dest, backup_file_name)
+
+        transfer_file_name = temp_file_name(source + '-transfer')
+        mysql_export(source, transfer_file_name)
+
+        mysql_import(transfer_file_name, dest)
+
+        delete_file(transfer_file_name)
+      else
+        puts "Invalid parameters."
+      end
     end
+
   end
 
   c.command :console do |console|
     console.action do |global_options, options, args|
-      database = args[0]
-      db_options = Settings[:databases][database]
-
+      db_options = db_options_for(args[0])
       mysql_for(db_options).console
     end
   end

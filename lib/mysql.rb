@@ -44,7 +44,7 @@ class MySQL
 
     dest = File.join(Dir.pwd, file_name)
 
-    command = "sudo #{mysqldump} --opt #{database_name} > #{dest}"
+    command = "sudo #{mysqldump} --verbose --opt #{database_name} > #{dest}"
 
     puts command
 
