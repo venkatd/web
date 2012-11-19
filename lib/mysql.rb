@@ -19,7 +19,7 @@ class MySQL
 
     opts[:user] = opts[:username]
     opts.delete(:username)
-    opts = opts.select { |k, _| include.include?(k) }
+    opts = opts.select { |k, v| include.include?(k) && v != nil && v != "" }
     opts.map { |option, value| "--#{option}=#{value}"}.join(" ")
   end
 
@@ -32,11 +32,11 @@ class MySQL
   end
 
   def mysqldump
-    "mysqldump #{options :user, :password, :host, :port}"
+    "mysqldump #{options :user, :password, :host, :port, :protocol}"
   end
 
   def mysql
-    "mysql #{options :user, :password, :host, :port}"
+    "mysql #{options :user, :password, :host, :port, :protocol}"
   end
 
   def export(database_name, file_name = nil)
